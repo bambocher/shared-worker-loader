@@ -24,8 +24,8 @@ module.exports.pitch = function (request) {
 
   const workerCompiler = this._compilation.createChildCompiler('sharedworker', output);
 
-  workerCompiler.apply(new WebWorkerTemplatePlugin(output));
-  workerCompiler.apply(new SingleEntryPlugin(this.context, `!!${request}`, 'main'));
+  new WebWorkerTemplatePlugin(output).apply(workerCompiler);
+  new SingleEntryPlugin(this.context, `!!${request}`, 'main').apply(workerCompiler);
 
   if (this.options && this.options.worker && this.options.worker.plugins) {
     this.options.worker.plugins.forEach((plugin) => {
@@ -34,11 +34,9 @@ module.exports.pitch = function (request) {
   }
 
   const subCache = `subcache ${__dirname} ${request}`;
-  workerCompiler.plugin('compilation', (compilation) => {
+  workerCompiler.hooks.compilation.tap({ name: 'SharedWorkerLoader' }, (compilation) => {
     if (compilation.cache) {
-      if (!compilation.cache[subCache]) {
-        compilation.cache[subCache] = {};
-      }
+      if (!compilation.cache[subCache]) { compilation.cache[subCache] = {}; }
       compilation.cache = compilation.cache[subCache];
     }
   });
