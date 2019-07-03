@@ -2,9 +2,6 @@
 /* eslint-disable func-names */
 const WebWorkerTemplatePlugin = require('webpack/lib/webworker/WebWorkerTemplatePlugin');
 const SingleEntryPlugin = require('webpack/lib/SingleEntryPlugin');
-const path = require('path');
-
-const loaderUtils = require('loader-utils');
 
 module.exports = function () {};
 module.exports.pitch = function (request) {
@@ -13,7 +10,6 @@ module.exports.pitch = function (request) {
   }
 
   const callback = this.async();
-  const query = loaderUtils.parseQuery(this.query);
   const output = {
     filename: '[hash].sharedworker.js',
     chunkFilename: '[id].[hash].sharedworker.js',
@@ -47,15 +43,11 @@ module.exports.pitch = function (request) {
     }
   });
 
-  workerCompiler.runAsChild((err, entries, compilation) => {
+  workerCompiler.runAsChild((err, entries) => {
     if (err) return callback(err);
     if (entries[0]) {
       const workerFile = entries[0].files[0];
-      let constructor = `new SharedWorker(__webpack_public_path__ + ${JSON.stringify(workerFile)}, name)`;
-      if (query.inline) {
-        constructor = `require(${JSON.stringify(`!!${path.join(__dirname, 'createInlineWorker.js')}`)})(${
-          JSON.stringify(compilation.assets[workerFile].source())}, __webpack_public_path__ + ${JSON.stringify(workerFile)}, name)`;
-      }
+      const constructor = `new SharedWorker(__webpack_public_path__ + ${JSON.stringify(workerFile)}, name)`;
       return callback(null, `module.exports = function(name) {\n\treturn ${constructor};\n};`);
     }
     return callback(null, null);
