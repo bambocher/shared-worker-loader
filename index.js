@@ -6,7 +6,7 @@ const SingleEntryPlugin = require('webpack/lib/SingleEntryPlugin');
 module.exports = function () {};
 module.exports.pitch = function (request) {
   if (!this.webpack) {
-    throw new Error('Only usable with webpack');
+    throw new Error('Shared Worker Loader is only usable with webpack');
   }
 
   const callback = this.async();
@@ -22,32 +22,34 @@ module.exports.pitch = function (request) {
     }
   }
 
-  const workerCompiler = this._compilation.createChildCompiler('sharedworker', output);
+  const compiler = this._compilation.createChildCompiler('sharedworker', output);
 
-  new WebWorkerTemplatePlugin(output).apply(workerCompiler);
-  new SingleEntryPlugin(this.context, `!!${request}`, 'main').apply(workerCompiler);
+  new WebWorkerTemplatePlugin(output).apply(compiler);
+  new SingleEntryPlugin(this.context, `!!${request}`, 'main').apply(compiler);
 
   if (this.options && this.options.worker && this.options.worker.plugins) {
     this.options.worker.plugins.forEach((plugin) => {
-      workerCompiler.apply(plugin);
+      compiler.apply(plugin);
     });
   }
 
   const subCache = `subcache ${__dirname} ${request}`;
-  workerCompiler.hooks.compilation.tap({ name: 'SharedWorkerLoader' }, (compilation) => {
+  compiler.hooks.compilation.tap({ name: 'SharedWorkerLoader' }, (compilation) => {
     if (compilation.cache) {
       if (!compilation.cache[subCache]) { compilation.cache[subCache] = {}; }
       compilation.cache = compilation.cache[subCache];
     }
   });
 
-  workerCompiler.runAsChild((err, entries) => {
+  compiler.runAsChild((err, entries) => {
     if (err) return callback(err);
+
     if (entries[0]) {
-      const workerFile = entries[0].files[0];
-      const constructor = `new SharedWorker(__webpack_public_path__ + ${JSON.stringify(workerFile)}, name)`;
-      return callback(null, `module.exports = function(name) {\n\treturn ${constructor};\n};`);
+      const file = entries[0].files[0];
+      const factory = `new SharedWorker(__webpack_public_path__ + ${JSON.stringify(file)}, name)`;
+      return callback(null, `module.exports = function(name) {\n  return ${factory};\n};`);
     }
+
     return callback(null, null);
   });
 };
