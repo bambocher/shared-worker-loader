@@ -1,18 +1,41 @@
 /* eslint-disable no-param-reassign */
 /* eslint-disable func-names */
+const loaderUtils = require('loader-utils');
+const validateOptions = require('schema-utils');
 const WebWorkerTemplatePlugin = require('webpack/lib/webworker/WebWorkerTemplatePlugin');
 const SingleEntryPlugin = require('webpack/lib/SingleEntryPlugin');
 
 module.exports = function () {};
 module.exports.pitch = function (request) {
+  const options = loaderUtils.getOptions(this) || {};
+
+  validateOptions({
+    type: 'object',
+    properties: {
+      publicPath: {
+        type: 'string',
+      },
+      filename: {
+        type: 'string',
+      },
+      chunkFilename: {
+        type: 'string',
+      },
+    },
+  }, options, 'Shared Worker Loader');
+
   if (!this.webpack) {
     throw new Error('Shared Worker Loader is only usable with webpack');
   }
 
+  this.cacheable(false);
+
   const callback = this.async();
+  const filename = options.filename || 'js/worker.[contenthash:8].js';
+  const chunkFilename = options.chunkFilename || 'js/worker-[id].[contenthash:8].js';
   const output = {
-    filename: '[hash].sharedworker.js',
-    chunkFilename: '[id].[hash].sharedworker.js',
+    filename,
+    chunkFilename,
     namedChunkFilename: null,
   };
 
@@ -45,8 +68,11 @@ module.exports.pitch = function (request) {
     if (err) return callback(err);
 
     if (entries[0]) {
-      const file = entries[0].files[0];
-      const factory = `new SharedWorker(__webpack_public_path__ + ${JSON.stringify(file)}, name)`;
+      const file = JSON.stringify(entries[0].files[0]);
+      const publicPath = options.publicPath
+        ? JSON.stringify(options.publicPath)
+        : '__webpack_public_path__';
+      const factory = `new SharedWorker(${publicPath} + ${file}, name)`;
       return callback(null, `module.exports = function(name) {\n  return ${factory};\n};`);
     }
 
